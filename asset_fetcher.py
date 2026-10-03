@@ -1,8 +1,9 @@
 import os
 import random
+import subprocess
 import requests
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 from config import PEXELS_API_KEY, TEMP_DIR, FORMATS
 
@@ -198,6 +199,41 @@ def download_wikimedia_media(query: str, scene_id: int, format_type: str = "shor
         print(f"[AssetFetcher] Wikimedia video fetch error: {e}")
     return None
 
+def download_ytdlp_broll(query: str, scene_id: int, format_type: str = "shorts") -> Optional[Path]:
+    """
+    Downloads real 1080p B-roll video footage matching the scene query using yt-dlp.
+    No API keys, no cookies, zero cost.
+    """
+    output_path = TEMP_DIR / f"scene_{scene_id}_clip.mp4"
+    if output_path.exists() and output_path.stat().st_size > 50000:
+        return output_path
+        
+    search_query = f"{query} 4k stock footage no copyright"
+    print(f"[AssetFetcher] Sourcing REAL footage for Scene {scene_id} via yt-dlp: '{search_query}'...")
+    
+    cmd = [
+        "yt-dlp",
+        f"ytsearch1:{search_query}",
+        "--download-sections", "*00:05-00:15",
+        "-f", "bestvideo[height<=1080][ext=mp4]/best[ext=mp4]/best",
+        "-o", str(output_path),
+        "--force-overwrites",
+        "--no-playlist",
+        "--socket-timeout", "15"
+    ]
+    
+    try:
+        res = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, timeout=35)
+        if output_path.exists() and output_path.stat().st_size > 50000:
+            print(f"[AssetFetcher] Successfully acquired real video clip ({output_path.stat().st_size / 1024:.1f} KB) for Scene {scene_id}!")
+            return output_path
+        else:
+            print(f"[AssetFetcher] yt-dlp clip missing or too small")
+    except Exception as e:
+        print(f"[AssetFetcher] yt-dlp search exception: {e}")
+        
+    return None
+
 def fetch_assets_for_scenes(scenes: List[Dict[str, Any]], format_type: str = "shorts") -> List[Path]:
     """Retrieves or renders visuals for each scene in the script."""
     asset_paths = []
@@ -208,13 +244,22 @@ def fetch_assets_for_scenes(scenes: List[Dict[str, Any]], format_type: str = "sh
         query = scene.get("visual_query", "cinematic nature depth of field")
         print(f"[AssetFetcher] Locating real footage for Scene {scene_id}: '{query}'")
         
-        asset = None
-        if PEXELS_API_KEY:
+        # 1. Primary: Real B-roll footage via yt-dlp (Zero API Key required)
+        asset = download_ytdlp_broll(query, scene_id, format_type)
+        
+        # 2. Secondary: Pexels Video API (if key provided)
+        if not asset and PEXELS_API_KEY:
             asset = download_pexels_media(query, scene_id, format_type)
+            
+        # 3. Tertiary: Pixabay Video API (if key provided)
         if not asset:
             asset = download_pixabay_media(query, scene_id, format_type)
+            
+        # 4. Quaternary: Wikimedia Commons (Public domain clips)
         if not asset:
             asset = download_wikimedia_media(query, scene_id, format_type)
+            
+        # 5. Last resort fallback: Procedural motion canvas
         if not asset:
             print(f"[AssetFetcher] Falling back to procedural motion canvas for Scene {scene_id}")
             asset = create_cinematic_backdrop(scene_id, query, specs["width"], specs["height"])

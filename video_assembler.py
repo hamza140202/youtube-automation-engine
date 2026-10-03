@@ -146,7 +146,34 @@ def assemble_full_video(
     ]
     subprocess.run(concat_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=True)
     
-    # 4. Final render: Merge audio + burn stylized subtitles
+    # 4. Sound Design: Mix Voiceover with Atmospheric Ambient Tension Drone
+    ambient_audio = TEMP_DIR / "ambient_drone.wav"
+    drone_cmd = [
+        "ffmpeg", "-y",
+        "-f", "lavfi",
+        "-i", f"anoisesrc=d={total_audio_duration + 2}:c=pink:r=44100:a=0.04,lowpass=f=260",
+        "-c:a", "pcm_s16le",
+        str(ambient_audio)
+    ]
+    subprocess.run(drone_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    
+    mixed_audio = TEMP_DIR / "final_mixed_audio.wav"
+    if ambient_audio.exists():
+        mix_cmd = [
+            "ffmpeg", "-y",
+            "-i", str(audio_path.resolve()),
+            "-i", str(ambient_audio.resolve()),
+            "-filter_complex", "[0:a]volume=1.0[voice]; [1:a]volume=0.25[amb]; [voice][amb]amix=inputs=2:duration=first[aout]",
+            "-map", "[aout]",
+            "-c:a", "pcm_s16le",
+            str(mixed_audio)
+        ]
+        res_mix = subprocess.run(mix_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        active_audio = mixed_audio if res_mix.returncode == 0 else audio_path
+    else:
+        active_audio = audio_path
+
+    # 5. Final render: Merge video + mixed audio + burn stylized subtitles
     final_output = OUTPUT_DIR / output_filename
     margin_v = specs["subtitle_margin_v"]
     font_size = specs["subtitle_font_size"]
@@ -163,7 +190,7 @@ def assemble_full_video(
     final_cmd = [
         "ffmpeg", "-y",
         "-i", str(unsubbed_video.resolve()),
-        "-i", str(audio_path.resolve()),
+        "-i", str(active_audio.resolve()),
         "-vf", subtitles_filter,
         "-c:v", "libx264",
         "-c:a", "aac",
