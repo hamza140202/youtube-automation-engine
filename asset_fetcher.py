@@ -388,7 +388,7 @@ def fetch_assets_for_scenes(scenes: List[Dict[str, Any]], format_type: str = "sh
 
         asset = None
 
-        # 1. NASA Video Archives (authentic, open, 1080p)
+        # 1. NASA Video Archives (authentic, open, 1080p broadcast footage)
         asset = download_nasa_media(primary_term, scene_id)
 
         # 2. Pexels HD (if key present)
@@ -399,31 +399,27 @@ def fetch_assets_for_scenes(scenes: List[Dict[str, Any]], format_type: str = "sh
         if not asset and PIXABAY_API_KEY.strip():
             asset = download_pixabay_media(primary_term, scene_id)
 
-        # 4. Wikimedia Commons
-        if not asset:
-            asset = download_wikimedia_media(keywords, scene_id)
-
-        # 5. yt-dlp real B-roll
-        if not asset:
-            asset = download_ytdlp_with_ytagent(query, scene_id)
-
-        # 6. Verified public domain stream pool
+        # 4. Verified NASA / SVS Broadcast Stream Pool (100% verified 1080p, zero talking heads)
         if not asset:
             joined = " ".join(keywords).lower()
             if any(k in joined for k in ["ocean", "sea", "water", "marine", "abyss", "wave", "trench"]):
                 theme = "ocean"
-            elif any(k in joined for k in ["storm", "lightning", "cloud", "tree", "forest", "mountain"]):
+            elif any(k in joined for k in ["storm", "lightning", "cloud", "tree", "forest", "mountain", "nature"]):
                 theme = "nature"
-            elif any(k in joined for k in ["cell", "biology", "brain", "neuron", "micro", "atom"]):
+            elif any(k in joined for k in ["cell", "biology", "brain", "neuron", "micro", "atom", "science"]):
                 theme = "science"
             else:
                 theme = "space"
-            print(f"[AssetFetcher] Tier 6: Curated verified {theme} stream pool for Scene {scene_id}")
+            print(f"[AssetFetcher] Tier 4: Sourcing verified broadcast {theme} stream pool for Scene {scene_id}")
             asset = download_curated_stock(theme, scene_id)
 
-        # 7. Synthetic backdrop (never fails)
+        # 5. yt-dlp 1080p B-roll
         if not asset:
-            print(f"[AssetFetcher] Tier 7: Generating synthetic backdrop for Scene {scene_id}")
+            asset = download_ytdlp_with_ytagent(query, scene_id)
+
+        # 6. Synthetic backdrop (never fails)
+        if not asset:
+            print(f"[AssetFetcher] Tier 6: Generating synthetic backdrop for Scene {scene_id}")
             asset = generate_synthetic_backdrop(scene_id, duration=10.0, format_type=format_type)
 
         print(f"[AssetFetcher] Scene {scene_id} -> {asset.name} ({asset.stat().st_size / (1024*1024):.2f}MB)")
