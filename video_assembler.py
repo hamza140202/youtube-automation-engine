@@ -41,8 +41,8 @@ def create_scene_clip(asset_path: Path, duration: float, scene_id: int, format_t
     total_frames = int(duration * fps) + 5
     output_clip = TEMP_DIR / f"clip_{scene_id}.mp4"
     
-    # 1. Real MP4 Video Footage Processing
-    if asset_path.suffix.lower() in [".mp4", ".mov", ".webm", ".mkv"]:
+    # 1. Real MP4/WebM/OGV Video Footage Processing
+    if asset_path.suffix.lower() in [".mp4", ".mov", ".webm", ".mkv", ".ogv"]:
         print(f"[VideoAssembler] Processing REAL video clip for Scene {scene_id} ({asset_path.name})...")
         cmd = [
             "ffmpeg", "-y",
@@ -90,7 +90,7 @@ def create_scene_clip(asset_path: Path, duration: float, scene_id: int, format_t
         fallback_cmd = [
             "ffmpeg", "-y",
             "-loop", "1",
-            "-i", str(image_path),
+            "-i", str(asset_path),
             "-t", f"{duration:.2f}",
             "-s", f"{width}x{height}",
             "-c:v", "libx264",
