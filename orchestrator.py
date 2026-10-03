@@ -35,9 +35,9 @@ def run_pipeline(topic: str, format_type: str = "shorts", voice: str = DEFAULT_V
     
     # 2. Voice & Subtitle Synthesis
     print("\n[Step 2/4] Synthesizing Neural Voiceover & Word Timestamps...")
-    audio_path, srt_path = synthesize_speech(full_narration, voice, run_slug)
+    audio_path, srt_path, ass_path = synthesize_speech(full_narration, voice, run_slug)
     print(f"✓ Audio: {audio_path.name}")
-    print(f"✓ Subtitles: {srt_path.name}")
+    print(f"✓ Subtitles: {srt_path.name} & {ass_path.name}")
     
     # 3. Asset Retrieval
     print("\n[Step 3/4] Preparing HD Scene Visuals & Motion Backdrops...")
@@ -45,14 +45,15 @@ def run_pipeline(topic: str, format_type: str = "shorts", voice: str = DEFAULT_V
     print(f"✓ Prepared {len(scene_assets)} scene visuals.")
     
     # 4. Assembly & Subtitle Burn-In
-    print("\n[Step 4/4] Assembling Final MP4 (Ken Burns Motion + Subtitles)...")
+    print("\n[Step 4/4] Assembling Final MP4 (Real Footage + Kinetic ASS Subtitles)...")
     output_filename = f"{run_slug}_{format_type}.mp4"
     final_video_path = assemble_full_video(
         scene_assets=scene_assets,
         audio_path=audio_path,
         srt_path=srt_path,
         output_filename=output_filename,
-        format_type=format_type
+        format_type=format_type,
+        ass_path=ass_path
     )
     
     # Save YouTube Metadata

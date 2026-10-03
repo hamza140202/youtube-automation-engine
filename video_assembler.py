@@ -1,9 +1,11 @@
 import os
+import shutil
 import subprocess
 import json
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from config import FORMATS, OUTPUT_DIR, TEMP_DIR
+from voice_synthesizer import convert_srt_to_ass
 
 def get_audio_duration(audio_path: Path) -> float:
     """Uses ffprobe to get exact duration in seconds."""
@@ -18,20 +20,13 @@ def get_audio_duration(audio_path: Path) -> float:
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
         return float(result.stdout.strip())
     except Exception as e:
-        print(f"[VideoAssembler] ffprobe fallback check: {e}")
-        # Rough fallback: 150 words per minute ~ 2.5 words per sec
+        print(f"[VideoAssembler] ffprobe check fallback: {e}")
         return 45.0
-
-def escape_ffmpeg_path(path: Path) -> str:
-    """Escapes file path properly for ffmpeg filter arguments."""
-    posix_path = path.as_posix()
-    # In ffmpeg filters, colons and backslashes must be escaped
-    return posix_path.replace(":", "\\:").replace("'", "\\'")
 
 def create_scene_clip(asset_path: Path, duration: float, scene_id: int, format_type: str = "shorts") -> Path:
     """
     Renders an individual scene video clip.
-    If the asset is a real MP4 video, trims, scales, crops, and loops it.
+    If the asset is a real MP4/WebM/OGV video, trims past intro, scales, crops, and loops it.
     If the asset is an image, applies a cinematic Ken Burns zoom/pan effect.
     """
     specs = FORMATS.get(format_type, FORMATS["shorts"])
@@ -44,8 +39,10 @@ def create_scene_clip(asset_path: Path, duration: float, scene_id: int, format_t
     # 1. Real MP4/WebM/OGV Video Footage Processing
     if asset_path.suffix.lower() in [".mp4", ".mov", ".webm", ".mkv", ".ogv"]:
         print(f"[VideoAssembler] Processing REAL video clip for Scene {scene_id} ({asset_path.name})...")
+        # Start at 2.5s into clip to skip opening titles/fades and capture prime movement
         cmd = [
             "ffmpeg", "-y",
+            "-ss", "00:00:02.500",
             "-stream_loop", "-1",
             "-i", str(asset_path),
             "-t", f"{duration:.2f}",
@@ -59,9 +56,25 @@ def create_scene_clip(asset_path: Path, duration: float, scene_id: int, format_t
         res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         if res.returncode == 0:
             return output_clip
-        print(f"[VideoAssembler] Real video processing warning: {res.stderr[-200:]}")
+        print(f"[VideoAssembler] Primary clip cut warning, trying without seek: {res.stderr[-200:]}")
+        # Fallback without initial seek
+        cmd_noseek = [
+            "ffmpeg", "-y",
+            "-stream_loop", "-1",
+            "-i", str(asset_path),
+            "-t", f"{duration:.2f}",
+            "-vf", f"scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},fps={fps}",
+            "-c:v", "libx264",
+            "-pix_fmt", "yuv420p",
+            "-preset", "ultrafast",
+            "-an",
+            str(output_clip)
+        ]
+        res2 = subprocess.run(cmd_noseek, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if res2.returncode == 0:
+            return output_clip
 
-    # 2. Image Processing with Ken Burns Dynamic Zoom
+    # 2. Image Processing with Ken Burns Dynamic Zoom (if ever passed)
     if scene_id % 2 == 0:
         zoom_expr = "min(zoom+0.0008,1.15)"
         x_expr = "iw/2-(iw/zoom/2)"
@@ -82,24 +95,7 @@ def create_scene_clip(asset_path: Path, duration: float, scene_id: int, format_t
         "-preset", "ultrafast",
         str(output_clip)
     ]
-    
-    res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    if res.returncode != 0:
-        print(f"[VideoAssembler] Clip generation warning: {res.stderr[-300:]}")
-        # Simple loop fallback if zoompan fails
-        fallback_cmd = [
-            "ffmpeg", "-y",
-            "-loop", "1",
-            "-i", str(asset_path),
-            "-t", f"{duration:.2f}",
-            "-s", f"{width}x{height}",
-            "-c:v", "libx264",
-            "-pix_fmt", "yuv420p",
-            "-preset", "ultrafast",
-            str(output_clip)
-        ]
-        subprocess.run(fallback_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
-        
+    subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return output_clip
 
 def assemble_full_video(
@@ -107,10 +103,11 @@ def assemble_full_video(
     audio_path: Path,
     srt_path: Path,
     output_filename: str = "final_video.mp4",
-    format_type: str = "shorts"
+    format_type: str = "shorts",
+    ass_path: Optional[Path] = None
 ) -> Path:
     """
-    Merges all scene clips, syncs with voiceover audio, burns kinetic subtitles,
+    Merges all scene clips, syncs with voiceover audio, burns kinetic ASS subtitles,
     and produces the final high-definition MP4.
     """
     specs = FORMATS.get(format_type, FORMATS["shorts"])
@@ -151,7 +148,7 @@ def assemble_full_video(
     drone_cmd = [
         "ffmpeg", "-y",
         "-f", "lavfi",
-        "-i", f"anoisesrc=d={total_audio_duration + 2}:c=pink:r=44100:a=0.04,lowpass=f=260",
+        "-i", f"anoisesrc=d={total_audio_duration + 2}:c=pink:r=44100:a=0.035,lowpass=f=260",
         "-c:a", "pcm_s16le",
         str(ambient_audio)
     ]
@@ -163,7 +160,7 @@ def assemble_full_video(
             "ffmpeg", "-y",
             "-i", str(audio_path.resolve()),
             "-i", str(ambient_audio.resolve()),
-            "-filter_complex", "[0:a]volume=1.0[voice]; [1:a]volume=0.25[amb]; [voice][amb]amix=inputs=2:duration=first[aout]",
+            "-filter_complex", "[0:a]volume=1.0[voice]; [1:a]volume=0.22[amb]; [voice][amb]amix=inputs=2:duration=first[aout]",
             "-map", "[aout]",
             "-c:a", "pcm_s16le",
             str(mixed_audio)
@@ -173,19 +170,18 @@ def assemble_full_video(
     else:
         active_audio = audio_path
 
-    # 5. Final render: Merge video + mixed audio + burn stylized subtitles
+    # 5. Final render: Merge video + mixed audio + burn stylized ASS kinetic subtitles
     final_output = OUTPUT_DIR / output_filename
     margin_v = specs["subtitle_margin_v"]
-    font_size = specs["subtitle_font_size"]
     
-    import shutil
-    local_srt_name = "current_subtitles.srt"
-    local_srt = TEMP_DIR / local_srt_name
-    shutil.copy2(srt_path, local_srt)
-    
-    # Run with cwd=TEMP_DIR so the subtitles path has NO slashes or colons
-    style = f"FontSize={font_size}\\,PrimaryColour=&H0000FFFF\\,OutlineColour=&H00000000\\,Bold=1\\,Outline=2\\,Alignment=2\\,MarginV={margin_v}"
-    subtitles_filter = f"subtitles={local_srt_name}:force_style='{style}'"
+    local_ass_name = "current_subtitles.ass"
+    local_ass = TEMP_DIR / local_ass_name
+    if ass_path and ass_path.exists():
+        shutil.copy2(ass_path, local_ass)
+    else:
+        convert_srt_to_ass(srt_path, local_ass, margin_v=margin_v)
+        
+    subtitles_filter = f"ass={local_ass_name}"
     
     final_cmd = [
         "ffmpeg", "-y",
@@ -200,15 +196,15 @@ def assemble_full_video(
         str(final_output.resolve())
     ]
     
-    print("[VideoAssembler] Burning subtitles and exporting final MP4...")
+    print("[VideoAssembler] Burning ASS kinetic subtitles and exporting final MP4...")
     res = subprocess.run(final_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, cwd=str(TEMP_DIR))
     if res.returncode != 0:
-        print(f"[VideoAssembler] Subtitle filter warning (exit code {res.returncode}):\n{res.stderr[-500:]}")
-        print("[VideoAssembler] Retrying video export without burned subtitles...")
+        print(f"[VideoAssembler] ASS filter warning (exit code {res.returncode}):\n{res.stderr[-300:]}")
+        print("[VideoAssembler] Retrying with clean video export...")
         fallback_cmd = [
             "ffmpeg", "-y",
             "-i", str(unsubbed_video.resolve()),
-            "-i", str(audio_path.resolve()),
+            "-i", str(active_audio.resolve()),
             "-c:v", "libx264",
             "-c:a", "aac",
             "-b:a", "192k",

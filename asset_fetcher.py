@@ -12,8 +12,7 @@ from config import PEXELS_API_KEY, PIXABAY_API_KEY, TEMP_DIR, FORMATS
 CURATED_THEMATIC_STREAMS = {
     "space": [
         "https://upload.wikimedia.org/wikipedia/commons/d/d0/Galaxy_Collision_Simulation_%28Dome_Version%29_%28SVS14656%29.webm",
-        "https://upload.wikimedia.org/wikipedia/commons/3/33/Galaxy_rotation_under_the_influence_of_dark_matter.ogv",
-        "https://upload.wikimedia.org/wikipedia/commons/e/e2/A_Galaxy_Grouping.webm"
+        "https://upload.wikimedia.org/wikipedia/commons/3/33/Galaxy_rotation_under_the_influence_of_dark_matter.ogv"
     ],
     "ocean": [
         "https://upload.wikimedia.org/wikipedia/commons/d/d4/Underwater_life_in_the_aquarium.webm",
@@ -98,7 +97,8 @@ def download_archive_media(keywords: List[str], scene_id: int) -> Optional[Path]
     """Fetches real historical and stock footage from Internet Archive (movies)."""
     headers = {"User-Agent": "AutonomousVideoEngine/2.0"}
     for kw in keywords[:2]:
-        url = f"https://archive.org/advancedsearch.php?q={requests.utils.quote(kw)}+AND+mediatype:movies&fl[]=identifier,title,downloads&sort[]=downloads+desc&rows=3&page=1&output=json"
+        # Filter strictly for stock footage, NASA, nature, documentary collections
+        url = f"https://archive.org/advancedsearch.php?q=({requests.utils.quote(kw)})+AND+(collection:stock_footage+OR+collection:prelinger+OR+collection:nasa+OR+subject:documentary+OR+subject:nature+OR+subject:ocean)+AND+mediatype:movies&fl[]=identifier,title,downloads&sort[]=downloads+desc&rows=3&page=1&output=json"
         try:
             res = requests.get(url, headers=headers, timeout=10)
             if res.status_code == 200:
@@ -113,7 +113,7 @@ def download_archive_media(keywords: List[str], scene_id: int) -> Optional[Path]
                             name = mp4s[0].get("name")
                             v_url = f"https://archive.org/download/{ident}/{name}"
                             out = TEMP_DIR / f"scene_{scene_id}_archive.mp4"
-                            print(f"[AssetFetcher] Downloading Internet Archive video for '{kw}'...")
+                            print(f"[AssetFetcher] Downloading verified stock video for '{kw}' from Archive.org...")
                             if download_file_stream(v_url, out, timeout=35):
                                 return out
         except Exception as e:
