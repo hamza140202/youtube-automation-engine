@@ -79,7 +79,7 @@ def download_file_stream(url: str, output_path: Path, timeout: int = 40, headers
 # Millions of verified videos for space, ocean, earth, storms, science.
 # ---------------------------------------------------------------------------
 def download_nasa_media(query: str, scene_id: int) -> Optional[Path]:
-    """Downloads broadcast-grade scientific footage directly from NASA Images API."""
+    """Downloads broadcast-grade scientific footage directly from NASA Images API, filtering for pure cinematic B-roll."""
     print(f"[AssetFetcher][NASA] Searching NASA Video Archive for '{query}'...")
     try:
         search_url = f"https://images-api.nasa.gov/search?q={requests.utils.quote(query)}&media_type=video"
@@ -90,8 +90,17 @@ def download_nasa_media(query: str, scene_id: int) -> Optional[Path]:
         if not items:
             return None
 
-        # Try top 3 video matches
-        for item in items[:3]:
+        # Filter out talking heads, lectures, interviews, and press briefings
+        banned_phrases = ["we asked", "presentation", "interview", "press", "briefing", "conference", "panel", "talk"]
+        filtered_items = []
+        for it in items:
+            title = it.get("data", [{}])[0].get("title", "").lower()
+            if not any(b in title for b in banned_phrases):
+                filtered_items.append(it)
+        if not filtered_items:
+            filtered_items = items
+
+        for item in filtered_items[:4]:
             data = item.get("data", [{}])[0]
             nasa_id = data.get("nasa_id")
             if not nasa_id:
