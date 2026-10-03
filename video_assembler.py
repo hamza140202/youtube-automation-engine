@@ -28,9 +28,11 @@ def escape_ffmpeg_path(path: Path) -> str:
     # In ffmpeg filters, colons and backslashes must be escaped
     return posix_path.replace(":", "\\:").replace("'", "\\'")
 
-def create_scene_clip(image_path: Path, duration: float, scene_id: int, format_type: str = "shorts") -> Path:
+def create_scene_clip(asset_path: Path, duration: float, scene_id: int, format_type: str = "shorts") -> Path:
     """
-    Renders an individual scene video clip with a cinematic Ken Burns zoom/pan effect.
+    Renders an individual scene video clip.
+    If the asset is a real MP4 video, trims, scales, crops, and loops it.
+    If the asset is an image, applies a cinematic Ken Burns zoom/pan effect.
     """
     specs = FORMATS.get(format_type, FORMATS["shorts"])
     width = specs["width"]
@@ -39,7 +41,27 @@ def create_scene_clip(image_path: Path, duration: float, scene_id: int, format_t
     total_frames = int(duration * fps) + 5
     output_clip = TEMP_DIR / f"clip_{scene_id}.mp4"
     
-    # Alternate zoom-in vs zoom-out per scene
+    # 1. Real MP4 Video Footage Processing
+    if asset_path.suffix.lower() in [".mp4", ".mov", ".webm", ".mkv"]:
+        print(f"[VideoAssembler] Processing REAL video clip for Scene {scene_id} ({asset_path.name})...")
+        cmd = [
+            "ffmpeg", "-y",
+            "-stream_loop", "-1",
+            "-i", str(asset_path),
+            "-t", f"{duration:.2f}",
+            "-vf", f"scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},fps={fps}",
+            "-c:v", "libx264",
+            "-pix_fmt", "yuv420p",
+            "-preset", "ultrafast",
+            "-an",
+            str(output_clip)
+        ]
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        if res.returncode == 0:
+            return output_clip
+        print(f"[VideoAssembler] Real video processing warning: {res.stderr[-200:]}")
+
+    # 2. Image Processing with Ken Burns Dynamic Zoom
     if scene_id % 2 == 0:
         zoom_expr = "min(zoom+0.0008,1.15)"
         x_expr = "iw/2-(iw/zoom/2)"
@@ -52,7 +74,7 @@ def create_scene_clip(image_path: Path, duration: float, scene_id: int, format_t
     cmd = [
         "ffmpeg", "-y",
         "-loop", "1",
-        "-i", str(image_path),
+        "-i", str(asset_path),
         "-vf", f"scale=1440:-2,zoompan=z='{zoom_expr}':x='{x_expr}':y='{y_expr}':d={total_frames}:s={width}x{height}:fps={fps}",
         "-t", f"{duration:.2f}",
         "-c:v", "libx264",

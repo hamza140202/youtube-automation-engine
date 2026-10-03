@@ -107,24 +107,34 @@ def create_cinematic_backdrop(scene_id: int, query: str, width: int = 1080, heig
     return output_path
 
 def download_pexels_media(query: str, scene_id: int, format_type: str = "shorts") -> Path:
-    """Fetches high-definition media from Pexels API if API key is provided."""
+    """Fetches real high-definition MP4 video clips from Pexels Video API."""
     headers = {"Authorization": PEXELS_API_KEY}
-    url = f"https://api.pexels.com/v1/search?query={query}&per_page=3&orientation={'portrait' if format_type == 'shorts' else 'landscape'}"
+    orientation = "portrait" if format_type == "shorts" else "landscape"
+    video_search_url = f"https://api.pexels.com/videos/search?query={query}&per_page=5&orientation={orientation}"
     
     try:
-        response = requests.get(url, headers=headers, timeout=10)
+        response = requests.get(video_search_url, headers=headers, timeout=12)
         if response.status_code == 200:
             data = response.json()
-            photos = data.get("photos", [])
-            if photos:
-                img_url = photos[0]["src"]["large2x"]
-                img_res = requests.get(img_url, timeout=15)
-                output_path = TEMP_DIR / f"scene_{scene_id}_bg.jpg"
-                with open(output_path, "wb") as f:
-                    f.write(img_res.content)
-                return output_path
+            videos = data.get("videos", [])
+            for vid in videos:
+                files = vid.get("video_files", [])
+                mp4_files = [f for f in files if f.get("file_type") == "video/mp4"]
+                if mp4_files:
+                    # Choose closest to 1080p width for fast download and crisp resolution
+                    best_file = min(mp4_files, key=lambda f: abs(f.get("width", 1080) - 1080))
+                    v_url = best_file.get("link")
+                    if v_url:
+                        output_path = TEMP_DIR / f"scene_{scene_id}_clip.mp4"
+                        print(f"[AssetFetcher] Downloading REAL video footage for Scene {scene_id} from Pexels ({best_file.get('width')}x{best_file.get('height')})...")
+                        with requests.get(v_url, stream=True, timeout=25) as r:
+                            r.raise_for_status()
+                            with open(output_path, "wb") as f:
+                                for chunk in r.iter_content(chunk_size=65536):
+                                    f.write(chunk)
+                        return output_path
     except Exception as e:
-        print(f"[AssetFetcher] Pexels download fallback: {e}")
+        print(f"[AssetFetcher] Pexels video fetch error: {e}")
         
     specs = FORMATS.get(format_type, FORMATS["shorts"])
     return create_cinematic_backdrop(scene_id, query, specs["width"], specs["height"])
