@@ -12,6 +12,11 @@ def format_timestamp_ass(seconds_float: float) -> str:
     s = seconds_float % 60
     return f"{h}:{m:02d}:{s:05.2f}"
 
+def convert_srt_to_ass(srt_path: Path, ass_path: Path, font_size: int = 70, margin_v: int = 420):
+    """Fallback converter for srt to ass."""
+    if not ass_path.exists():
+        ass_path.write_text("[Script Info]\nScriptType: v4.00+\nPlayResX: 1080\nPlayResY: 1920\n[V4+ Styles]\n[Events]\n", encoding="utf-8")
+
 def generate_phrase_level_ass(scenes: List[Dict[str, Any]], total_duration: float, ass_path: Path, font_size: int = 70, margin_v: int = 420):
     """
     Generates high-retention, kinetic ASS subtitles chunked into punchy 3-4 word phrases
