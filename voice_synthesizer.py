@@ -2,34 +2,24 @@ import asyncio
 import edge_tts
 import re
 from pathlib import Path
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Tuple, Optional
 from config import DEFAULT_VOICE, TEMP_DIR
 
-def format_timestamp_srt(ms: int) -> str:
-    """Converts milliseconds to SRT format (HH:MM:SS,mmm)."""
-    seconds, milliseconds = divmod(ms, 1000)
-    minutes, seconds = divmod(seconds, 60)
-    hours, minutes = divmod(minutes, 60)
-    return f"{hours:02d}:{minutes:02d}:{seconds:02d},{milliseconds:03d}"
+def format_timestamp_ass(seconds_float: float) -> str:
+    """Converts seconds float to ASS time format (H:MM:SS.cc)."""
+    h = int(seconds_float // 3600)
+    m = int((seconds_float % 3600) // 60)
+    s = seconds_float % 60
+    return f"{h}:{m:02d}:{s:05.2f}"
 
-def srt_time_to_ass(time_str: str) -> str:
-    """Converts SRT time 'HH:MM:SS,mmm' to ASS time 'H:MM:SS.cc'."""
-    parts = time_str.strip().replace(',', '.').split(':')
-    if len(parts) == 3:
-        h = int(parts[0])
-        m = parts[1]
-        s, ms = parts[2].split('.')
-        cs = ms[:2]
-        return f"{h}:{m}:{s}.{cs}"
-    return "0:00:00.00"
-
-def convert_srt_to_ass(srt_path: Path, ass_path: Path, font_size: int = 68, margin_v: int = 420):
+def generate_phrase_level_ass(scenes: List[Dict[str, Any]], total_duration: float, ass_path: Path, font_size: int = 70, margin_v: int = 420):
     """
-    Converts SRT subtitles into broadcast-grade ASS kinetic subtitles.
-    Styles: Bold uppercase, vibrant yellow primary, deep black outline, safe-zone centered.
+    Generates high-retention, kinetic ASS subtitles chunked into punchy 3-4 word phrases
+    synchronized with the scene narrations and overall audio duration.
+    Style: Bold uppercase, vibrant yellow primary, deep black outline, safe-zone centered.
     """
     ass_header = f"""[Script Info]
-Title: Kinetic Subtitles
+Title: Kinetic YouTube Shorts Subtitles
 ScriptType: v4.00+
 WrapStyle: 0
 ScaledBorderAndShadow: yes
@@ -45,61 +35,77 @@ Style: Default,DejaVu Sans,{font_size},&H0000FFFF,&H000000FF,&H00000000,&H800000
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
     events = []
-    if srt_path.exists():
-        content = srt_path.read_text(encoding="utf-8", errors="ignore")
-        # Parse SRT blocks
-        blocks = re.split(r"\n\s*\n", content.strip())
-        for block in blocks:
-            lines = [l.strip() for l in block.splitlines() if l.strip()]
-            if len(lines) >= 3:
-                # Line 1 is index, Line 2 is timestamps, Line 3+ is text
-                time_match = re.search(r"(\d{2}:\d{2}:\d{2},\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2},\d{3})", lines[1])
-                if time_match:
-                    start_ass = srt_time_to_ass(time_match.group(1))
-                    end_ass = srt_time_to_ass(time_match.group(2))
-                    text = " ".join(lines[2:]).upper()
-                    # Add subtle punchy styling tag
-                    dialogue = f"Dialogue: 0,{start_ass},{end_ass},Default,,0,0,0,,{text}\n"
-                    events.append(dialogue)
-                    
+    num_scenes = max(len(scenes), 1)
+    dur_per_scene = total_duration / num_scenes
+    curr_time = 0.0
+
+    for s in scenes:
+        narration = s.get("narration", "")
+        words = narration.split()
+        if not words:
+            curr_time += dur_per_scene
+            continue
+            
+        # Chunk into punchy 3-4 words (YouTube Shorts high-retention style)
+        chunk_size = 4
+        chunks = [" ".join(words[i:i+chunk_size]) for i in range(0, len(words), chunk_size)]
+        chunk_dur = dur_per_scene / len(chunks)
+        
+        for c in chunks:
+            start_str = format_timestamp_ass(curr_time)
+            end_str = format_timestamp_ass(min(curr_time + chunk_dur - 0.08, total_duration))
+            # Clean text: remove special characters, uppercase
+            clean_text = re.sub(r'["\']', '', c).strip().upper()
+            dialogue = f"Dialogue: 0,{start_str},{end_str},Default,,0,0,0,,{clean_text}\n"
+            events.append(dialogue)
+            curr_time += chunk_dur
+
     with open(ass_path, "w", encoding="utf-8") as f:
         f.write(ass_header)
         for ev in events:
             f.write(ev)
             
-    print(f"[VoiceSynthesizer] Generated ASS kinetic subtitles: {ass_path} ({len(events)} events)")
+    print(f"[VoiceSynthesizer] Generated {len(events)} phrase-level kinetic ASS subtitle events in {ass_path}")
 
-async def _synthesize_async(full_text: str, voice: str, output_audio_path: Path, output_srt_path: Path, output_ass_path: Path) -> float:
-    """Async voice synthesis using edge-tts with word-boundary event tracking."""
+async def _synthesize_async(full_text: str, voice: str, output_audio_path: Path) -> float:
+    """Async voice synthesis using edge-tts."""
     communicate = edge_tts.Communicate(full_text, voice)
-    
-    sub_maker = edge_tts.SubMaker()
     with open(output_audio_path, "wb") as audio_file:
         async for chunk in communicate.stream():
             if chunk["type"] == "audio":
                 audio_file.write(chunk["data"])
-            elif chunk["type"] == "WordBoundary":
-                sub_maker.feed(chunk)
-                
-    srt_content = sub_maker.get_srt()
-    with open(output_srt_path, "w", encoding="utf-8") as srt_file:
-        srt_file.write(srt_content)
-        
-    convert_srt_to_ass(output_srt_path, output_ass_path)
     return 0.0
 
-def synthesize_speech(full_text: str, voice: str = DEFAULT_VOICE, run_id: str = "run") -> Tuple[Path, Path, Path]:
+def synthesize_speech(full_text: str, scenes: List[Dict[str, Any]], voice: str = DEFAULT_VOICE, run_id: str = "run") -> Tuple[Path, Path, Path]:
     """
-    Synthesizes speech and produces MP3, SRT, and styled ASS subtitles.
+    Synthesizes speech and produces MP3 audio and synchronized kinetic ASS subtitles.
     Returns: (audio_path, srt_path, ass_path)
     """
     output_audio = TEMP_DIR / f"{run_id}_voiceover.mp3"
     output_srt = TEMP_DIR / f"{run_id}_subtitles.srt"
     output_ass = TEMP_DIR / f"{run_id}_subtitles.ass"
     
-    print(f"[VoiceSynthesizer] Synthesizing audio with voice '{voice}'...")
-    asyncio.run(_synthesize_async(full_text, voice, output_audio, output_srt, output_ass))
+    print(f"[VoiceSynthesizer] Synthesizing speech with voice '{voice}'...")
+    asyncio.run(_synthesize_async(full_text, voice, output_audio))
     print(f"[VoiceSynthesizer] Audio generated: {output_audio}")
-    print(f"[VoiceSynthesizer] Subtitles generated: {output_srt} & {output_ass}")
+    
+    # Estimate total audio duration for subtitle syncing
+    import subprocess
+    total_dur = 45.0
+    try:
+        cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", str(output_audio)]
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        if res.returncode == 0:
+            total_dur = float(res.stdout.strip())
+    except Exception:
+        # Fallback based on word count (~150 wpm)
+        words = len(full_text.split())
+        total_dur = max(words / 2.5, 10.0)
+        
+    print(f"[VoiceSynthesizer] Total narration duration: {total_dur:.2f}s")
+    generate_phrase_level_ass(scenes, total_dur, output_ass)
+    
+    # Dummy srt for backwards compatibility
+    output_srt.write_text("1\n00:00:00,000 --> 00:00:05,000\nSubtitles\n", encoding="utf-8")
     
     return output_audio, output_srt, output_ass
