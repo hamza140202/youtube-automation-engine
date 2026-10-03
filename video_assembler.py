@@ -129,11 +129,15 @@ def assemble_full_video(
     margin_v = specs["subtitle_margin_v"]
     font_size = specs["subtitle_font_size"]
     
-    # High-retention subtitle styling: Bold Arial, bright yellow/white, bold black border
-    style = f"FontName=DejaVu Sans,FontSize={font_size},PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BackColour=&H80000000,Bold=1,Outline=3,Alignment=2,MarginV={margin_v}"
-    escaped_srt = escape_ffmpeg_path(srt_path)
+    import shutil
+    local_srt = TEMP_DIR / "current_subtitles.srt"
+    shutil.copy2(srt_path, local_srt)
+    escaped_srt = local_srt.as_posix()
     
-    subtitles_filter = f"subtitles='{escaped_srt}':force_style='{style}'"
+    # High-retention subtitle styling: Bright yellow (&H0000FFFF), bold black border, centered
+    # Note: commas in force_style MUST be escaped as \, for FFmpeg AVFilterGraph parser
+    style = f"FontName=DejaVu Sans\\,FontSize={font_size}\\,PrimaryColour=&H0000FFFF\\,OutlineColour=&H00000000\\,BackColour=&H80000000\\,Bold=1\\,Outline=3\\,Alignment=2\\,MarginV={margin_v}"
+    subtitles_filter = f"subtitles={escaped_srt}:force_style='{style}'"
     
     final_cmd = [
         "ffmpeg", "-y",

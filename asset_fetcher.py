@@ -64,7 +64,32 @@ def create_cinematic_backdrop(scene_id: int, query: str, width: int = 1080, heig
         brightness = random.randint(140, 255)
         star_draw.ellipse([(px, py), (px + size, py + size)], fill=(brightness, brightness, brightness))
         
-    # 4. Cinematic top and bottom letterbox / vignette gradient
+    # 4. Focal Graphic Card & Scene Highlights
+    card_overlay = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    c_draw = ImageDraw.Draw(card_overlay)
+    
+    # Pill badge at top (y=220)
+    badge_w, badge_h = 360, 50
+    badge_x = (width - badge_w) // 2
+    badge_y = 220
+    c_draw.rounded_rectangle([(badge_x, badge_y), (badge_x + badge_w, badge_y + badge_h)], radius=25, fill=(0, 0, 0, 180), outline=palette[3], width=2)
+    badge_text = f"● RESEARCH LOG #{scene_id:02d}"
+    c_draw.text((badge_x + 60, badge_y + 14), badge_text, fill=(255, 255, 255, 240))
+    
+    # Modern focal card in upper third (y=340 to 520)
+    card_w = int(width * 0.84)
+    card_h = 160
+    card_x = (width - card_w) // 2
+    card_y = 340
+    c_draw.rounded_rectangle([(card_x, card_y), (card_x + card_w, card_y + card_h)], radius=20, fill=(15, 23, 42, 210), outline=(255, 255, 255, 40), width=2)
+    # Accent glowing underline
+    c_draw.line([(card_x + 30, card_y + card_h - 12), (card_x + card_w - 30, card_y + card_h - 12)], fill=palette[3], width=4)
+    
+    # Card text: Clean uppercase visual topic
+    clean_title = " ".join([w.capitalize() for w in query.split()[:4]])
+    c_draw.text((card_x + 40, card_y + 45), clean_title, fill=(255, 255, 255, 255))
+    
+    # 5. Cinematic top and bottom letterbox / vignette gradient
     vignette = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     v_draw = ImageDraw.Draw(vignette)
     v_steps = 40
@@ -75,6 +100,7 @@ def create_cinematic_backdrop(scene_id: int, query: str, width: int = 1080, heig
         # Bottom shadow
         v_draw.rectangle([(0, height - (v + 1) * 10), (width, height - v * 10)], fill=(0, 0, 0, alpha))
         
+    img.paste(card_overlay, (0, 0), card_overlay)
     img.paste(vignette, (0, 0), vignette)
     
     img.save(output_path, "PNG", quality=95)
