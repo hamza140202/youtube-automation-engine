@@ -130,46 +130,44 @@ def assemble_full_video(
     font_size = specs["subtitle_font_size"]
     
     import shutil
-    local_srt = TEMP_DIR / "current_subtitles.srt"
+    local_srt_name = "current_subtitles.srt"
+    local_srt = TEMP_DIR / local_srt_name
     shutil.copy2(srt_path, local_srt)
-    escaped_srt = local_srt.as_posix()
     
-    # High-retention subtitle styling: Bright yellow (&H0000FFFF), bold black border, centered
-    # Note: commas in force_style MUST be escaped as \, for FFmpeg AVFilterGraph parser
-    style = f"FontName=DejaVu Sans\\,FontSize={font_size}\\,PrimaryColour=&H0000FFFF\\,OutlineColour=&H00000000\\,BackColour=&H80000000\\,Bold=1\\,Outline=3\\,Alignment=2\\,MarginV={margin_v}"
-    subtitles_filter = f"subtitles={escaped_srt}:force_style='{style}'"
+    # Run with cwd=TEMP_DIR so the subtitles path has NO slashes or colons
+    style = f"FontSize={font_size}\\,PrimaryColour=&H0000FFFF\\,OutlineColour=&H00000000\\,Bold=1\\,Outline=2\\,Alignment=2\\,MarginV={margin_v}"
+    subtitles_filter = f"subtitles={local_srt_name}:force_style='{style}'"
     
     final_cmd = [
         "ffmpeg", "-y",
-        "-i", str(unsubbed_video),
-        "-i", str(audio_path),
+        "-i", str(unsubbed_video.resolve()),
+        "-i", str(audio_path.resolve()),
         "-vf", subtitles_filter,
         "-c:v", "libx264",
         "-c:a", "aac",
         "-b:a", "192k",
         "-pix_fmt", "yuv420p",
         "-shortest",
-        str(final_output)
+        str(final_output.resolve())
     ]
     
     print("[VideoAssembler] Burning subtitles and exporting final MP4...")
-    try:
-        subprocess.run(final_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=True)
-    except subprocess.CalledProcessError as e:
-        print(f"[VideoAssembler] Subtitle filter error ({e}). Retrying without burned subtitles...")
-        # Fallback if font/subtitles filter has system-specific font issues
+    res = subprocess.run(final_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, cwd=str(TEMP_DIR))
+    if res.returncode != 0:
+        print(f"[VideoAssembler] Subtitle filter warning (exit code {res.returncode}):\n{res.stderr[-500:]}")
+        print("[VideoAssembler] Retrying video export without burned subtitles...")
         fallback_cmd = [
             "ffmpeg", "-y",
-            "-i", str(unsubbed_video),
-            "-i", str(audio_path),
+            "-i", str(unsubbed_video.resolve()),
+            "-i", str(audio_path.resolve()),
             "-c:v", "libx264",
             "-c:a", "aac",
             "-b:a", "192k",
             "-pix_fmt", "yuv420p",
             "-shortest",
-            str(final_output)
+            str(final_output.resolve())
         ]
-        subprocess.run(fallback_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=True)
+        subprocess.run(fallback_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
         
     print(f"[VideoAssembler] Video exported successfully: {final_output}")
     return final_output
