@@ -42,3 +42,4 @@ ALTERNATIVE_VOICES = [
 # API Keys from environment
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 PEXELS_API_KEY = os.getenv("PEXELS_API_KEY", "")
+PIXABAY_API_KEY = os.getenv("PIXABAY_API_KEY", "")

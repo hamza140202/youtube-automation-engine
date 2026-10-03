@@ -133,11 +133,70 @@ def download_pexels_media(query: str, scene_id: int, format_type: str = "shorts"
                                 for chunk in r.iter_content(chunk_size=65536):
                                     f.write(chunk)
                         return output_path
+    return None
+
+def download_pixabay_media(query: str, scene_id: int, format_type: str = "shorts"):
+    """Fetches real HD MP4 video clips from Pixabay Video API."""
+    from config import PIXABAY_API_KEY
+    if not PIXABAY_API_KEY:
+        return None
+    url = f"https://pixabay.com/api/videos/?key={PIXABAY_API_KEY}&q={requests.utils.quote(query)}&video_type=film&per_page=5"
+    try:
+        response = requests.get(url, timeout=12)
+        if response.status_code == 200:
+            data = response.json()
+            hits = data.get("hits", [])
+            for hit in hits:
+                videos = hit.get("videos", {})
+                target = videos.get("medium") or videos.get("large") or videos.get("small")
+                if target and target.get("url"):
+                    v_url = target.get("url")
+                    output_path = TEMP_DIR / f"scene_{scene_id}_clip.mp4"
+                    print(f"[AssetFetcher] Downloading REAL video footage for Scene {scene_id} from Pixabay...")
+                    with requests.get(v_url, stream=True, timeout=25) as r:
+                        r.raise_for_status()
+                        with open(output_path, "wb") as f:
+                            for chunk in r.iter_content(chunk_size=65536):
+                                f.write(chunk)
+                    return output_path
     except Exception as e:
-        print(f"[AssetFetcher] Pexels video fetch error: {e}")
-        
-    specs = FORMATS.get(format_type, FORMATS["shorts"])
-    return create_cinematic_backdrop(scene_id, query, specs["width"], specs["height"])
+        print(f"[AssetFetcher] Pixabay video download error: {e}")
+    return None
+
+def download_wikimedia_media(query: str, scene_id: int, format_type: str = "shorts"):
+    """Fetches real public domain video clips from Wikimedia Commons (Zero API Key needed)."""
+    first_keyword = query.split()[0] if query.split() else "Nature"
+    search_url = f"https://commons.wikimedia.org/w/api.php?action=query&list=search&srsearch={requests.utils.quote(first_keyword)}%20filetype:video&srnamespace=6&format=json&srlimit=4"
+    headers = {"User-Agent": "VideoEngineBot/1.0 (contact: admin@localhost)"}
+    
+    try:
+        res = requests.get(search_url, headers=headers, timeout=10)
+        if res.status_code == 200:
+            items = res.json().get("query", {}).get("search", [])
+            for item in items:
+                title = item["title"].replace(" ", "_")
+                info_url = f"https://commons.wikimedia.org/w/api.php?action=query&titles={title}&prop=imageinfo&iiprop=url|size&format=json"
+                ires = requests.get(info_url, headers=headers, timeout=10)
+                if ires.status_code == 200:
+                    pages = ires.json().get("query", {}).get("pages", {})
+                    for p in pages.values():
+                        for info in p.get("imageinfo", []):
+                            size_mb = info.get("size", 0) / (1024 * 1024)
+                            v_url = info.get("url", "")
+                            # Select clips between 1MB and 25MB for fast reliable download
+                            if 0.5 < size_mb < 25.0 and (v_url.endswith(".webm") or v_url.endswith(".mp4") or v_url.endswith(".ogv")):
+                                ext = ".webm" if v_url.endswith(".webm") else (".mp4" if v_url.endswith(".mp4") else ".ogv")
+                                output_path = TEMP_DIR / f"scene_{scene_id}_clip{ext}"
+                                print(f"[AssetFetcher] Downloading REAL video footage ({size_mb:.1f}MB) from Wikimedia for Scene {scene_id}...")
+                                with requests.get(v_url, stream=True, headers=headers, timeout=25) as r:
+                                    r.raise_for_status()
+                                    with open(output_path, "wb") as f:
+                                        for chunk in r.iter_content(chunk_size=65536):
+                                            f.write(chunk)
+                                return output_path
+    except Exception as e:
+        print(f"[AssetFetcher] Wikimedia video fetch error: {e}")
+    return None
 
 def fetch_assets_for_scenes(scenes: List[Dict[str, Any]], format_type: str = "shorts") -> List[Path]:
     """Retrieves or renders visuals for each scene in the script."""
@@ -147,11 +206,17 @@ def fetch_assets_for_scenes(scenes: List[Dict[str, Any]], format_type: str = "sh
     for scene in scenes:
         scene_id = scene.get("scene_id", 1)
         query = scene.get("visual_query", "cinematic nature depth of field")
-        print(f"[AssetFetcher] Generating asset for Scene {scene_id}: '{query}'")
+        print(f"[AssetFetcher] Locating real footage for Scene {scene_id}: '{query}'")
         
+        asset = None
         if PEXELS_API_KEY:
             asset = download_pexels_media(query, scene_id, format_type)
-        else:
+        if not asset:
+            asset = download_pixabay_media(query, scene_id, format_type)
+        if not asset:
+            asset = download_wikimedia_media(query, scene_id, format_type)
+        if not asset:
+            print(f"[AssetFetcher] Falling back to procedural motion canvas for Scene {scene_id}")
             asset = create_cinematic_backdrop(scene_id, query, specs["width"], specs["height"])
             
         asset_paths.append(asset)
