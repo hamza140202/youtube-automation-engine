@@ -1,0 +1,89 @@
+name: Autonomous YouTube Video Generation Engine
+
+on:
+  workflow_dispatch:
+    inputs:
+      topic:
+        description: 'Video Topic'
+        required: true
+        default: 'The Mystery of Quantum Entanglement'
+      format:
+        description: 'Format (shorts or landscape)'
+        required: true
+        default: 'shorts'
+        type: choice
+        options:
+          - shorts
+          - landscape
+      voice:
+        description: 'Voice ID'
+        required: true
+        default: 'en-US-ChristopherNeural'
+
+  schedule:
+    # Daily automation at 12:00 UTC ("set up and sleep on it")
+    - cron: '0 12 * * *'
+
+jobs:
+  build-and-render:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Codebase
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install System Dependencies (FFmpeg & Fonts)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-liberation fonts-dejavu-core
+
+      - name: Install Python Dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Execute Autonomous Video Generation
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+        run: |
+          TOPIC="${{ github.event.inputs.topic || 'The Mystery of Quantum Entanglement' }}"
+          FORMAT="${{ github.event.inputs.format || 'shorts' }}"
+          VOICE="${{ github.event.inputs.voice || 'en-US-ChristopherNeural' }}"
+          python orchestrator.py --topic "$TOPIC" --format "$FORMAT" --voice "$VOICE"
+
+      - name: Upload Video Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-youtube-video-${{ github.run_number }}
+          path: |
+            output/*.mp4
+            output/*.json
+          retention-days: 30
+
+      - name: Publish Video to GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: success()
+        with:
+          tag_name: video-run-${{ github.run_number }}
+          name: "Generated Video: ${{ github.event.inputs.topic || 'Daily Automated Pilot' }}"
+          body: |
+            ## 🎬 YouTube Video Render Complete
+            - **Generated Date**: ${{ github.event.repository.updated_at }}
+            - **Format**: ${{ github.event.inputs.format || 'shorts' }}
+            - **Run Number**: ${{ github.run_number }}
+            
+            Download the attached `.mp4` file and upload to YouTube directly or preview on your mobile/desktop!
+          files: |
+            output/*.mp4
+            output/*.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
