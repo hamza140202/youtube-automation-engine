@@ -12,33 +12,33 @@ from config import PEXELS_API_KEY, PIXABAY_API_KEY, TEMP_DIR, FORMATS
 # Real broadcast-grade footage (Galaxy collision, Solar flares, Ocean waves).
 # ---------------------------------------------------------------------------
 GUARANTEED_WORKING_STREAMS = [
+    "http://images-assets.nasa.gov/video/jsc2024m000130_Expedition_71_International_Space_Station_Flyover_of_Hurricane_Beryl_240701/jsc2024m000130_Expedition_71_International_Space_Station_Flyover_of_Hurricane_Beryl_240701~orig.mp4",
+    "http://images-assets.nasa.gov/video/GSFC_20160426_SDO_m12224_SolarFlare/GSFC_20160426_SDO_m12224_SolarFlare~orig.mp4",
+    "http://images-assets.nasa.gov/video/GSFC_20181002_SMBH_m13043_Simulation/GSFC_20181002_SMBH_m13043_Simulation~orig.mp4",
     "https://upload.wikimedia.org/wikipedia/commons/d/d0/Galaxy_Collision_Simulation_%28Dome_Version%29_%28SVS14656%29.webm",
     "https://upload.wikimedia.org/wikipedia/commons/3/33/Galaxy_rotation_under_the_influence_of_dark_matter.ogv",
-    "https://upload.wikimedia.org/wikipedia/commons/b/b8/Sunspot_Moving_Across_the_Sun.webm",
-    "https://upload.wikimedia.org/wikipedia/commons/8/8e/Soliton.webm",
-    "https://upload.wikimedia.org/wikipedia/commons/6/6c/Tornado0.ogv",
 ]
 
 CURATED_THEMATIC_STREAMS = {
     "space": [
+        "http://images-assets.nasa.gov/video/GSFC_20181002_SMBH_m13043_Simulation/GSFC_20181002_SMBH_m13043_Simulation~orig.mp4",
+        "http://images-assets.nasa.gov/video/GSFC_20160426_SDO_m12224_SolarFlare/GSFC_20160426_SDO_m12224_SolarFlare~orig.mp4",
         "https://upload.wikimedia.org/wikipedia/commons/d/d0/Galaxy_Collision_Simulation_%28Dome_Version%29_%28SVS14656%29.webm",
-        "https://upload.wikimedia.org/wikipedia/commons/3/33/Galaxy_rotation_under_the_influence_of_dark_matter.ogv",
-        "https://upload.wikimedia.org/wikipedia/commons/b/b8/Sunspot_Moving_Across_the_Sun.webm",
     ],
     "ocean": [
-        "https://upload.wikimedia.org/wikipedia/commons/8/8e/Soliton.webm",
-        "https://upload.wikimedia.org/wikipedia/commons/d/d0/Galaxy_Collision_Simulation_%28Dome_Version%29_%28SVS14656%29.webm",
+        "http://images-assets.nasa.gov/video/jsc2024m000130_Expedition_71_International_Space_Station_Flyover_of_Hurricane_Beryl_240701/jsc2024m000130_Expedition_71_International_Space_Station_Flyover_of_Hurricane_Beryl_240701~orig.mp4",
+        "http://images-assets.nasa.gov/video/GSFC_20160426_SDO_m12224_SolarFlare/GSFC_20160426_SDO_m12224_SolarFlare~orig.mp4",
         "https://upload.wikimedia.org/wikipedia/commons/3/33/Galaxy_rotation_under_the_influence_of_dark_matter.ogv",
     ],
     "nature": [
-        "https://upload.wikimedia.org/wikipedia/commons/6/6c/Tornado0.ogv",
-        "https://upload.wikimedia.org/wikipedia/commons/8/8e/Soliton.webm",
+        "http://images-assets.nasa.gov/video/jsc2024m000130_Expedition_71_International_Space_Station_Flyover_of_Hurricane_Beryl_240701/jsc2024m000130_Expedition_71_International_Space_Station_Flyover_of_Hurricane_Beryl_240701~orig.mp4",
+        "http://images-assets.nasa.gov/video/GSFC_20160426_SDO_m12224_SolarFlare/GSFC_20160426_SDO_m12224_SolarFlare~orig.mp4",
         "https://upload.wikimedia.org/wikipedia/commons/d/d0/Galaxy_Collision_Simulation_%28Dome_Version%29_%28SVS14656%29.webm",
     ],
     "science": [
-        "https://upload.wikimedia.org/wikipedia/commons/b/b8/Sunspot_Moving_Across_the_Sun.webm",
+        "http://images-assets.nasa.gov/video/GSFC_20181002_SMBH_m13043_Simulation/GSFC_20181002_SMBH_m13043_Simulation~orig.mp4",
+        "http://images-assets.nasa.gov/video/GSFC_20160426_SDO_m12224_SolarFlare/GSFC_20160426_SDO_m12224_SolarFlare~orig.mp4",
         "https://upload.wikimedia.org/wikipedia/commons/3/33/Galaxy_rotation_under_the_influence_of_dark_matter.ogv",
-        "https://upload.wikimedia.org/wikipedia/commons/d/d0/Galaxy_Collision_Simulation_%28Dome_Version%29_%28SVS14656%29.webm",
     ],
 }
 
