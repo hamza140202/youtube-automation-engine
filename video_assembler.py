@@ -53,15 +53,31 @@ def create_scene_clip(image_path: Path, duration: float, scene_id: int, format_t
         "ffmpeg", "-y",
         "-loop", "1",
         "-i", str(image_path),
-        "-vf", f"scale=8000:-1,zoompan=z='{zoom_expr}':x='{x_expr}':y='{y_expr}':d={total_frames}:s={width}x{height}:fps={fps}",
+        "-vf", f"scale=1440:-2,zoompan=z='{zoom_expr}':x='{x_expr}':y='{y_expr}':d={total_frames}:s={width}x{height}:fps={fps}",
         "-t", f"{duration:.2f}",
         "-c:v", "libx264",
         "-pix_fmt", "yuv420p",
-        "-preset", "veryfast",
+        "-preset", "ultrafast",
         str(output_clip)
     ]
     
-    subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=True)
+    res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if res.returncode != 0:
+        print(f"[VideoAssembler] Clip generation warning: {res.stderr[-300:]}")
+        # Simple loop fallback if zoompan fails
+        fallback_cmd = [
+            "ffmpeg", "-y",
+            "-loop", "1",
+            "-i", str(image_path),
+            "-t", f"{duration:.2f}",
+            "-s", f"{width}x{height}",
+            "-c:v", "libx264",
+            "-pix_fmt", "yuv420p",
+            "-preset", "ultrafast",
+            str(output_clip)
+        ]
+        subprocess.run(fallback_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+        
     return output_clip
 
 def assemble_full_video(

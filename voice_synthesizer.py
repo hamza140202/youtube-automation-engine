@@ -27,8 +27,6 @@ async def _synthesize_async(full_text: str, voice: str, output_audio_path: Path,
     with open(output_srt_path, "w", encoding="utf-8") as srt_file:
         srt_file.write(srt_content)
         
-    # Calculate duration
-    import mutagen.mp3 if False else None
     return 0.0
 
 def synthesize_speech(full_text: str, voice: str = DEFAULT_VOICE, run_id: str = "run") -> Tuple[Path, Path]:
