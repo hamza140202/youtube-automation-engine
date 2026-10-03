@@ -134,6 +134,8 @@ def download_pexels_media(query: str, scene_id: int, format_type: str = "shorts"
                                 for chunk in r.iter_content(chunk_size=65536):
                                     f.write(chunk)
                         return output_path
+    except Exception as e:
+        print(f"[AssetFetcher] Pexels video fetch error: {e}")
     return None
 
 def download_pixabay_media(query: str, scene_id: int, format_type: str = "shorts"):
