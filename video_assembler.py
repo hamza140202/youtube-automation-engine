@@ -39,10 +39,10 @@ def create_scene_clip(asset_path: Path, duration: float, scene_id: int, format_t
     # 1. Real MP4/WebM/OGV Video Footage Processing
     if asset_path.suffix.lower() in [".mp4", ".mov", ".webm", ".mkv", ".ogv"]:
         print(f"[VideoAssembler] Processing REAL video clip for Scene {scene_id} ({asset_path.name})...")
-        # Start at 2.5s into clip to skip opening titles/fades and capture prime movement
+        # Start at 6.0s into clip to skip opening titles, title cards, and fades, capturing prime movement
         cmd = [
             "ffmpeg", "-y",
-            "-ss", "00:00:02.500",
+            "-ss", "00:00:06.000",
             "-stream_loop", "-1",
             "-i", str(asset_path),
             "-t", f"{duration:.2f}",
@@ -56,8 +56,24 @@ def create_scene_clip(asset_path: Path, duration: float, scene_id: int, format_t
         res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         if res.returncode == 0:
             return output_clip
-        print(f"[VideoAssembler] Primary clip cut warning, trying without seek: {res.stderr[-200:]}")
-        # Fallback without initial seek
+        print(f"[VideoAssembler] Primary clip cut warning, trying with 2.5s seek: {res.stderr[-200:]}")
+        # Secondary fallback with 2.5s seek
+        cmd_2s = [
+            "ffmpeg", "-y",
+            "-ss", "00:00:02.500",
+            "-stream_loop", "-1",
+            "-i", str(asset_path),
+            "-t", f"{duration:.2f}",
+            "-vf", f"scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},fps={fps}",
+            "-c:v", "libx264",
+            "-pix_fmt", "yuv420p",
+            "-preset", "ultrafast",
+            "-an",
+            str(output_clip)
+        ]
+        res2 = subprocess.run(cmd_2s, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if res2.returncode == 0:
+            return output_clip
         cmd_noseek = [
             "ffmpeg", "-y",
             "-stream_loop", "-1",
