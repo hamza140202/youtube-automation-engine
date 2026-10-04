@@ -12,33 +12,35 @@ from config import PEXELS_API_KEY, PIXABAY_API_KEY, TEMP_DIR, FORMATS
 # Real broadcast-grade footage (Galaxy collision, Solar flares, Ocean waves).
 # ---------------------------------------------------------------------------
 GUARANTEED_WORKING_STREAMS = [
-    "http://images-assets.nasa.gov/video/jsc2024m000130_Expedition_71_International_Space_Station_Flyover_of_Hurricane_Beryl_240701/jsc2024m000130_Expedition_71_International_Space_Station_Flyover_of_Hurricane_Beryl_240701~orig.mp4",
-    "http://images-assets.nasa.gov/video/GSFC_20160426_SDO_m12224_SolarFlare/GSFC_20160426_SDO_m12224_SolarFlare~orig.mp4",
     "http://images-assets.nasa.gov/video/GSFC_20181002_SMBH_m13043_Simulation/GSFC_20181002_SMBH_m13043_Simulation~orig.mp4",
-    "https://upload.wikimedia.org/wikipedia/commons/d/d0/Galaxy_Collision_Simulation_%28Dome_Version%29_%28SVS14656%29.webm",
-    "https://upload.wikimedia.org/wikipedia/commons/3/33/Galaxy_rotation_under_the_influence_of_dark_matter.ogv",
+    "http://images-assets.nasa.gov/video/GSFC_20160426_SDO_m12224_SolarFlare/GSFC_20160426_SDO_m12224_SolarFlare~orig.mp4",
+    "http://images-assets.nasa.gov/video/GSFC_20181010_FERMI_m13058_Pulsar4K/GSFC_20181010_FERMI_m13058_Pulsar4K~orig.mp4",
+    "http://images-assets.nasa.gov/video/GSFC_20190424_HST_m13189_Hubble29/GSFC_20190424_HST_m13189_Hubble29~orig.mp4",
+    "http://images-assets.nasa.gov/video/jsc2024m000130_Expedition_71_International_Space_Station_Flyover_of_Hurricane_Beryl_240701/jsc2024m000130_Expedition_71_International_Space_Station_Flyover_of_Hurricane_Beryl_240701~orig.mp4",
 ]
 
 CURATED_THEMATIC_STREAMS = {
     "space": [
         "http://images-assets.nasa.gov/video/GSFC_20181002_SMBH_m13043_Simulation/GSFC_20181002_SMBH_m13043_Simulation~orig.mp4",
         "http://images-assets.nasa.gov/video/GSFC_20160426_SDO_m12224_SolarFlare/GSFC_20160426_SDO_m12224_SolarFlare~orig.mp4",
-        "https://upload.wikimedia.org/wikipedia/commons/d/d0/Galaxy_Collision_Simulation_%28Dome_Version%29_%28SVS14656%29.webm",
+        "http://images-assets.nasa.gov/video/GSFC_20181010_FERMI_m13058_Pulsar4K/GSFC_20181010_FERMI_m13058_Pulsar4K~orig.mp4",
+        "http://images-assets.nasa.gov/video/GSFC_20190424_HST_m13189_Hubble29/GSFC_20190424_HST_m13189_Hubble29~orig.mp4",
     ],
     "ocean": [
         "http://images-assets.nasa.gov/video/jsc2024m000130_Expedition_71_International_Space_Station_Flyover_of_Hurricane_Beryl_240701/jsc2024m000130_Expedition_71_International_Space_Station_Flyover_of_Hurricane_Beryl_240701~orig.mp4",
+        "http://images-assets.nasa.gov/video/GSFC_20181002_SMBH_m13043_Simulation/GSFC_20181002_SMBH_m13043_Simulation~orig.mp4",
         "http://images-assets.nasa.gov/video/GSFC_20160426_SDO_m12224_SolarFlare/GSFC_20160426_SDO_m12224_SolarFlare~orig.mp4",
-        "https://upload.wikimedia.org/wikipedia/commons/3/33/Galaxy_rotation_under_the_influence_of_dark_matter.ogv",
     ],
     "nature": [
         "http://images-assets.nasa.gov/video/jsc2024m000130_Expedition_71_International_Space_Station_Flyover_of_Hurricane_Beryl_240701/jsc2024m000130_Expedition_71_International_Space_Station_Flyover_of_Hurricane_Beryl_240701~orig.mp4",
         "http://images-assets.nasa.gov/video/GSFC_20160426_SDO_m12224_SolarFlare/GSFC_20160426_SDO_m12224_SolarFlare~orig.mp4",
-        "https://upload.wikimedia.org/wikipedia/commons/d/d0/Galaxy_Collision_Simulation_%28Dome_Version%29_%28SVS14656%29.webm",
+        "http://images-assets.nasa.gov/video/GSFC_20190424_HST_m13189_Hubble29/GSFC_20190424_HST_m13189_Hubble29~orig.mp4",
     ],
     "science": [
         "http://images-assets.nasa.gov/video/GSFC_20181002_SMBH_m13043_Simulation/GSFC_20181002_SMBH_m13043_Simulation~orig.mp4",
+        "http://images-assets.nasa.gov/video/GSFC_20181010_FERMI_m13058_Pulsar4K/GSFC_20181010_FERMI_m13058_Pulsar4K~orig.mp4",
         "http://images-assets.nasa.gov/video/GSFC_20160426_SDO_m12224_SolarFlare/GSFC_20160426_SDO_m12224_SolarFlare~orig.mp4",
-        "https://upload.wikimedia.org/wikipedia/commons/3/33/Galaxy_rotation_under_the_influence_of_dark_matter.ogv",
+        "http://images-assets.nasa.gov/video/GSFC_20190424_HST_m13189_Hubble29/GSFC_20190424_HST_m13189_Hubble29~orig.mp4",
     ],
 }
 
@@ -90,15 +92,34 @@ def download_nasa_media(query: str, scene_id: int) -> Optional[Path]:
         if not items:
             return None
 
-        # Filter out talking heads, lectures, interviews, and press briefings
+        # Filter out talking heads, lectures, interviews, press briefings, and legacy analog facility tapes (KSC/DFRC)
         banned_phrases = ["we asked", "presentation", "interview", "press", "briefing", "conference", "panel", "talk"]
         filtered_items = []
         for it in items:
-            title = it.get("data", [{}])[0].get("title", "").lower()
-            if not any(b in title for b in banned_phrases):
-                filtered_items.append(it)
+            d = it.get("data", [{}])[0]
+            title = d.get("title", "").lower()
+            nid = d.get("nasa_id", "").lower()
+            if any(b in title for b in banned_phrases):
+                continue
+            if nid.startswith("ksc_") or nid.startswith("dfrc_"):
+                continue
+            filtered_items.append(it)
         if not filtered_items:
-            filtered_items = items
+            # Fall back to items that do not start with ksc_
+            filtered_items = [it for it in items if not it.get("data", [{}])[0].get("nasa_id", "").lower().startswith("ksc_")]
+
+        # Sort Goddard / modern simulation / SDO / Hubble / Webb first
+        def nasa_priority(it):
+            nid = it.get("data", [{}])[0].get("nasa_id", "").upper()
+            title = it.get("data", [{}])[0].get("title", "").lower()
+            score = 0
+            if nid.startswith("GSFC_"): score += 50
+            if "sdo" in title or "sdo" in nid.lower(): score += 40
+            if "simulation" in title or "nebula" in title: score += 30
+            if "hubble" in title or "pulsar" in title: score += 20
+            return score
+
+        filtered_items.sort(key=nasa_priority, reverse=True)
 
         for item in filtered_items[:4]:
             data = item.get("data", [{}])[0]
