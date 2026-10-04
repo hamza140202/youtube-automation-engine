@@ -408,19 +408,30 @@ def fetch_assets_for_scenes(scenes: List[Dict[str, Any]], format_type: str = "sh
         print(f"\n[AssetFetcher] Scene {scene_id}: '{query}' -> primary search: '{primary_term}'")
 
         asset = None
+        is_entertainment_or_lifestyle = any(k in query.lower() for k in [
+            "kpop", "concert", "stage", "seoul", "dance", "studio", "fashion", "runway",
+            "microphone", "music", "crowd", "billboard", "city", "skyline", "interview",
+            "lifestyle", "stadium", "festival", "choreography", "paparazzi", "idol",
+            "piano", "guitar", "recording", "glam", "neon", "lights"
+        ])
 
-        # 1. NASA Video Archives (authentic, open, 1080p broadcast footage)
-        asset = download_nasa_media(primary_term, scene_id)
+        # 1. For music/lifestyle/urban topics: Sourcing authentic 1080p B-Roll via yt-dlp first
+        if is_entertainment_or_lifestyle:
+            asset = download_ytdlp_with_ytagent(query, scene_id)
 
-        # 2. Pexels HD (if key present)
+        # 2. NASA Video Archives (authentic, open, 1080p broadcast footage for science/cosmos)
+        if not asset and not is_entertainment_or_lifestyle:
+            asset = download_nasa_media(primary_term, scene_id)
+
+        # 3. Pexels HD (if key present)
         if not asset and PEXELS_API_KEY.strip():
             asset = download_pexels_media(primary_term, scene_id)
 
-        # 3. Pixabay HD (if key present)
+        # 4. Pixabay HD (if key present)
         if not asset and PIXABAY_API_KEY.strip():
             asset = download_pixabay_media(primary_term, scene_id)
 
-        # 4. Verified NASA / SVS Broadcast Stream Pool (100% verified 1080p, zero talking heads)
+        # 5. Verified Broadcast Stream Pool
         if not asset:
             joined = " ".join(keywords).lower()
             if any(k in joined for k in ["ocean", "sea", "water", "marine", "abyss", "wave", "trench"]):
@@ -431,7 +442,7 @@ def fetch_assets_for_scenes(scenes: List[Dict[str, Any]], format_type: str = "sh
                 theme = "science"
             else:
                 theme = "space"
-            print(f"[AssetFetcher] Tier 4: Sourcing verified broadcast {theme} stream pool for Scene {scene_id}")
+            print(f"[AssetFetcher] Sourcing broadcast {theme} stream pool for Scene {scene_id}")
             asset = download_curated_stock(theme, scene_id)
 
         # 5. yt-dlp 1080p B-roll

@@ -159,24 +159,51 @@ def assemble_full_video(
     ]
     subprocess.run(concat_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=True)
     
-    # 4. Sound Design: Mix Voiceover with Atmospheric Ambient Tension Drone
-    ambient_audio = TEMP_DIR / "ambient_drone.wav"
-    drone_cmd = [
-        "ffmpeg", "-y",
-        "-f", "lavfi",
-        "-i", f"anoisesrc=d={total_audio_duration + 2}:c=pink:r=44100:a=0.035,lowpass=f=260",
-        "-c:a", "pcm_s16le",
-        str(ambient_audio)
-    ]
-    subprocess.run(drone_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    
+    # 4. Sound Design: Mix Voiceover with Atmospheric Ambient Soundscape or Emotional Piano Soundtrack
+    bg_audio = None
+    if format_type in ["landscape", "documentary"]:
+        piano_track = TEMP_DIR / "documentary_piano_bed.mp3"
+        if not piano_track.exists():
+            print("[VideoAssembler] Sourcing emotional cinematic piano background soundtrack...")
+            dl_cmd = [
+                "yt-dlp",
+                "ytsearch1:emotional cinematic piano background music royalty free",
+                "--download-sections", "*00:05-04:00",
+                "-x", "--audio-format", "mp3",
+                "-o", str(piano_track),
+                "--force-overwrites",
+                "--no-playlist",
+                "-q"
+            ]
+            try:
+                subprocess.run(dl_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=40)
+            except Exception:
+                pass
+        if piano_track.exists() and piano_track.stat().st_size > 10000:
+            bg_audio = piano_track
+
+    # Fallback to atmospheric pink-noise drone if soundtrack not available
+    if not bg_audio:
+        ambient_audio = TEMP_DIR / "ambient_drone.wav"
+        drone_cmd = [
+            "ffmpeg", "-y",
+            "-f", "lavfi",
+            "-i", f"anoisesrc=d={total_audio_duration + 2}:c=pink:r=44100:a=0.035,lowpass=f=260",
+            "-c:a", "pcm_s16le",
+            str(ambient_audio)
+        ]
+        subprocess.run(drone_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        bg_audio = ambient_audio if ambient_audio.exists() else None
+
     mixed_audio = TEMP_DIR / "final_mixed_audio.wav"
-    if ambient_audio.exists():
+    if bg_audio and bg_audio.exists():
+        bg_vol = "0.15" if format_type in ["landscape", "documentary"] else "0.22"
         mix_cmd = [
             "ffmpeg", "-y",
             "-i", str(audio_path.resolve()),
-            "-i", str(ambient_audio.resolve()),
-            "-filter_complex", "[0:a]volume=1.0[voice]; [1:a]volume=0.22[amb]; [voice][amb]amix=inputs=2:duration=first[aout]",
+            "-stream_loop", "-1",
+            "-i", str(bg_audio.resolve()),
+            "-filter_complex", f"[0:a]volume=1.0[voice]; [1:a]volume={bg_vol}[bg]; [voice][bg]amix=inputs=2:duration=first[aout]",
             "-map", "[aout]",
             "-c:a", "pcm_s16le",
             str(mixed_audio)

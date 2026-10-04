@@ -40,7 +40,7 @@ def run_pipeline(topic: str, format_type: str = "shorts", voice: str = DEFAULT_V
     # 2. Voice & Subtitle Synthesis
     print("\n[Step 2/4] Synthesizing Neural Voiceover & Word Timestamps...")
     send_telegram_update("🎙 <b>[2/4] Voice & Subtitles:</b> Synthesizing Edge-TTS neural voiceover & word timestamps...")
-    audio_path, srt_path, ass_path = synthesize_speech(full_narration, scenes, voice, run_slug)
+    audio_path, srt_path, ass_path = synthesize_speech(full_narration, scenes, voice, run_slug, format_type=format_type)
     print(f"[OK] Audio: {audio_path.name}")
     print(f"[OK] Subtitles: {srt_path.name} & {ass_path.name}")
     

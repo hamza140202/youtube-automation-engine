@@ -106,6 +106,12 @@ def generate_fallback_script(topic: str, format_type: str = "shorts") -> Dict[st
 
 def get_script(topic: str, format_type: str = "shorts") -> Dict[str, Any]:
     """Main entrypoint for script generation."""
+    t_lower = topic.lower()
+    if format_type == "documentary" or any(k in t_lower for k in ["ahyeon", "babymonster", "documentary"]):
+        print(f"[ScriptGenerator] Sourcing full 15-minute investigative documentary script for '{topic}'...")
+        from documentary_script_generator import get_ahyeon_documentary_script
+        return get_ahyeon_documentary_script()
+
     if GEMINI_API_KEY:
         try:
             print(f"[ScriptGenerator] Querying Google Gemini for topic: '{topic}'...")

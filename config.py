@@ -27,6 +27,15 @@ FORMATS = {
         "max_duration_seconds": 180,
         "subtitle_font_size": 26,
         "subtitle_margin_v": 120,
+    },
+    "documentary": {
+        "width": 1920,
+        "height": 1080,
+        "aspect_ratio": "16:9",
+        "fps": 30,
+        "max_duration_seconds": 960,
+        "subtitle_font_size": 24,
+        "subtitle_margin_v": 100,
     }
 }
 

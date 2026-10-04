@@ -8,13 +8,14 @@ on:
         required: true
         default: 'The Mystery of Quantum Entanglement'
       format:
-        description: 'Format (shorts or landscape)'
+        description: 'Format (shorts, landscape, or documentary)'
         required: true
         default: 'shorts'
         type: choice
         options:
           - shorts
           - landscape
+          - documentary
       voice:
         description: 'Voice ID'
         required: true
