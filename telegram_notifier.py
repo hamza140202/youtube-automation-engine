@@ -3,7 +3,7 @@ import requests
 from typing import Optional
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "8856348501:AAFsLNtALhE8Tjpmx4plzr19LO11TQhlN5g")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "1263089875")
 
 _cached_chat_id: Optional[str] = TELEGRAM_CHAT_ID if TELEGRAM_CHAT_ID else None
 
