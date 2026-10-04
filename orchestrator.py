@@ -83,7 +83,7 @@ def run_pipeline(topic: str, format_type: str = "shorts", voice: str = DEFAULT_V
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Autonomous YouTube Video Generator")
     parser.add_argument("--topic", type=str, default="The Simulation Theory Mystery", help="Video topic")
-    parser.add_argument("--format", type=str, default="shorts", choices=["shorts", "landscape"], help="Video format")
+    parser.add_argument("--format", type=str, default="shorts", choices=["shorts", "landscape", "documentary"], help="Video format")
     parser.add_argument("--voice", type=str, default=DEFAULT_VOICE, help="Edge-TTS voice")
     args = parser.parse_args()
     
